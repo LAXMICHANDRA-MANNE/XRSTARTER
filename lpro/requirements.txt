@@ -6,3 +6,4 @@ PyOpenGL
 pybullet
 tensorflow-cpu
 gunicorn
+flask-cors
