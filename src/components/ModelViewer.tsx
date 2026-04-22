@@ -9,7 +9,8 @@ function Loader() {
 }
 
 function Model() {
-  const obj = useLoader(OBJLoader, '/models/objfile.obj');
+  const modelPath = `${import.meta.env.BASE_URL}models/objfile.obj`;
+  const obj = useLoader(OBJLoader, modelPath);
   return <primitive object={obj} />;
 }
 
