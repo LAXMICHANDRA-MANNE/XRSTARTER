@@ -16,9 +16,21 @@ const LabsPage: React.FC = () => {
 
   const containerRef = useRef(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    // Start camera when entering Labs page
+    // Start browser camera for user-side viewing
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        })
+        .catch(err => console.error("Browser Camera Error:", err));
+    }
+
+    // Start remote camera (fallback/legacy)
     fetch(`${API_URLS.PYTHON_ENGINE}/start_camera`, { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
 
     return () => {
