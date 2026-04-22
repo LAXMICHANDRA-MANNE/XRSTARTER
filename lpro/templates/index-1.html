@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>XRSTARTER SIMULATOR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Three.js core + loaders -->
+<script src="/static/js/three.min.js"></script>
+<script src="/static/js/OBJLoader.js"></script>
+<script src="/static/js/GLTFLoader.js"></script>
+<script src="/static/js/STLLoader.js"></script>
+<script src="/static/js/PLYLoader.js"></script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
+    color: #0ff;
+}
+
+#camera-layer,
+#camera-feed,
+#overlay,
+#grid-overlay {
+    pointer-events: none; }
+
+/* CAMERA BACKGROUND */
+#camera-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background: #000;
+}
+#camera-feed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* DARK OVERLAY */
+#overlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(0,0,0,0.1), rgba(0,0,0,0.65));
+    z-index: -1;
+}
+
+/* GRID */
+#grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-size: 40px 40px;
+    background-image:
+        linear-gradient(to right, rgba(0,255,255,0.09) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0,255,255,0.09) 1px, transparent 1px);
+    animation: gridMove 12s linear infinite;
+}
+@keyframes gridMove {
+    from { background-position: 0 0; }
+    to   { background-position: 40px 40px; }
+}
+
+/* HEADER */
+.header {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,255,255,0.45);
+    box-shadow: 0 0 18px rgba(0,255,255,0.25);
+    font-size: 14px;
+}
+
+/* LEFT PANEL */
+.panel {
+    position: absolute;
+    left: 16px;
+    top: 70px;
+    width: 290px;
+    padding: 14px;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,255,255,0.4);
+    box-shadow: 0 0 18px rgba(0,255,255,0.3);
+    font-size: 13px;
+
+    pointer-events: auto; /* 🔑 REQUIRED */
+}
+
+.panel label { display:block; margin-bottom: 4px; }
+#fileUpload {
+    width: 100%;
+    margin-bottom: 8px;
+}
+button {
+    width: 100%;
+    padding: 8px;
+    border-radius: 999px;
+    border: 1px solid #0ff;
+    background: rgba(0,255,255,0.25);
+    color: #0ff;
+    cursor: pointer;
+    font-weight: 600;
+}
+button:hover {
+    background: rgba(0,255,255,0.45);
+    box-shadow: 0 0 12px #0ff;
+}
+#status {
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+/* VIEWER */
+#viewer-wrapper {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    top: 90px;
+    left: 320px;
+    border-radius: 16px;
+    border: 1px solid rgba(0,255,255,0.35);
+    background: rgba(0,0,0,0.15);
+    box-shadow: 0 0 25px rgba(0,255,255,0.25);
+    overflow: hidden;
+}
+#viewer {
+    width: 100%;
+    height: 100%;
+}
+
+@media (max-width: 900px) {
+    .panel {
+        width: calc(100% - 32px);
+        left: 16px;
+        top: 70px;
+    }
+    #viewer-wrapper {
+        left: 16px;
+        right: 16px;
+        top: 190px;
+        bottom: 16px;
+    }
+}
+</style>
+</head>
+<body>
+
+<div id="camera-layer">
+    <img id="camera-feed" src="/video_feed" alt="camera">
+</div>
+<div id="overlay"></div>
+<div id="grid-overlay"></div>
+
+<div class="header">XRSTARTER SIMULATOR V0.0.1 </div>
+
+<div class="panel">
+    <label for="fileUpload">Select 3D File</label>
+    <!-- Fallback form: if JS fails or is blocked, this will still POST the file -->
+<button onclick="loadPreset('corridor')">Sci-Fi Corridor</button>
+<button onclick="loadPreset('working')">Working Model</button>
+<button onclick="loadPreset('objfile')">OBJ File</button>
+
+
+    <p id="status">Waiting for camera & gestures…</p>
+    <p style="margin-top:8px; font-size:11px; opacity:.8;">
+        Gestures (from backend):<br>
+        • Left hand – Rotate / Peel<br>
+        • Right pinch – Zoom<br>
+        • Right index – Drag<br>
+        • Right open palm – Freeze
+    </p>
+</div>
+
+<div id="viewer-wrapper">
+    <div id="viewer"></div>
+</div>
+
+<script>
+let scene, camera, renderer;
+let rootObject = null;
+let baseScale = 1.0;
+let peelLayers = [];
+let peelEnabled = true;
+
+// ------------- INIT 3D -------------
+function init3D() {
+    scene = new THREE.Scene();
+
+    const viewer = document.getElementById("viewer");
+    const aspect = viewer.clientWidth / viewer.clientHeight;
+
+    camera = new THREE.PerspectiveCamera(60, aspect, 0.01, 1000);
+    camera.position.set(0, 0.5, 3);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    renderer.setClearColor(0x000000, 0);
+    viewer.appendChild(renderer.domElement);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(amb);
+
+    window.addEventListener("resize", onWindowResize);
+
+    requestAnimationFrame(loop);
+}
+
+function onWindowResize() {
+    const viewer = document.getElementById("viewer");
+    camera.aspect = viewer.clientWidth / viewer.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+}
+
+
+
+// ------------- MAIN LOOP -------------
+function loop() {
+    fetch("/status")
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById("status").innerText =
+                `Scale=${d.scale.toFixed(2)} Rot=${d.rotation.toFixed(2)} Peel=${d.peel.toFixed(2)}`;
+
+            if (rootObject) {
+                // zoom (scale)
+                const scaleFactor = THREE.MathUtils.clamp(d.scale, 0.4, 3.0);
+                rootObject.scale.setScalar(baseScale * scaleFactor);
+
+                // rotation
+                rootObject.rotation.y = d.rotation;
+
+                // peel layers
+                if (peelEnabled) applyPeel(d.peel);
+
+                // drag: right index-only
+                if (d.drag_active) {
+                    const nx = d.drag_x - 0.5;
+                    const ny = d.drag_y - 0.5;
+                    rootObject.position.x = nx * 3.0;
+                    rootObject.position.y = -ny * 3.0;
+                }
+            }
+        })
+        .catch(() => {});
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+}
+
+// ------------- UPLOAD (any format) -------------
+function uploadOBJ(evt) {
+    // evt may be a MouseEvent from onclick or a SubmitEvent when form submits
+    if (evt && evt.preventDefault) evt.preventDefault();
+
+    const fileInput = document.getElementById("fileUpload");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        console.error("No file selected!");
+        document.getElementById("status").innerText = "No file selected";
+        alert("Please select a file first.");
+        return;
+    }
+
+    console.log("Attempting to upload:", file.name);
+    document.getElementById("status").innerText = `Uploading ${file.name} ...`;
+
+    const fd = new FormData();
+    fd.append("objfile", file);
+
+    fetch("/upload", {
+        method: "POST",
+        body: fd
+    })
+    .then(async r => {
+        const text = await r.text();
+        console.log("Raw response text:", text);
+        try {
+            const json = JSON.parse(text);
+            if (!r.ok) throw new Error(json.error || (json.path ? null : 'no path in response'));
+            return json;
+        } catch (e) {
+            throw new Error("Invalid JSON response: " + e + " -- body: " + text);
+        }
+    })
+    .then(d => {
+        console.log("Server response:", d);
+        document.getElementById("status").innerText = `Uploaded: ${d.path}`;
+
+        if (!d.path) {
+            console.error("No path returned from server");
+            return;
+        }
+
+        // 🔒 FIX: prevent /uploads/uploads bug
+        const cleanPath = d.path.replace(/^\/?uploads\/?/, "");
+        const relPath = "/uploads/" + cleanPath;
+
+        console.log("Loading model from:", relPath);
+        loadModelByExtension(relPath);
+    })
+    .catch(err => {
+        console.error("Upload error:", err);
+        document.getElementById("status").innerText = `Upload failed: ${err.message}`;
+        alert("Upload failed. See console for details.");
+    });
+}
+
+// ------------- DISPATCH LOADER BY EXTENSION -------------
+function loadModelByExtension(path) {
+    const ext = path.split(".").pop().toLowerCase();
+
+    if (ext === "obj") {
+        loadOBJ(path);
+    } else if (ext === "gltf" || ext === "glb") {
+        loadGLTF(path);
+    } else if (ext === "stl") {
+        loadSTL(path);
+    } else if (ext === "ply") {
+        loadPLY(path);
+    } else {
+        alert("Unsupported format: " + ext);
+    }
+}
+
+// ------------- SHARED: SET ROOT OBJECT -------------
+function setRootObject(object3D) {
+    if (rootObject) scene.remove(rootObject);
+    
+    // 1. Assign to global variable
+    rootObject = object3D;
+
+    // 2. Center the geometry FIRST
+    autoFit(rootObject); 
+
+    // 3. Ensure materials are visible
+    rootObject.traverse(child => {
+        if (child.isMesh) {
+            child.material.side = THREE.DoubleSide; // Helps if normals are flipped
+            child.material.needsUpdate = true;
+        }
+    });
+
+    // 4. Build peel layers and add to scene
+    buildPeelLayers(rootObject);
+    scene.add(rootObject);
+    
+    console.log("Model successfully added to scene at:", rootObject.position);
+}
+// ------------- LOADERS -------------
+function loadOBJ(path) {
+    console.log("Loading OBJ:", path);
+
+    const loader = new THREE.OBJLoader();
+    loader.load(
+        path,
+        obj => {
+            console.log("OBJ loaded successfully");
+            setRootObject(obj);
+        },
+        xhr => {
+            if (xhr.total) {
+                console.log(`OBJ ${(xhr.loaded / xhr.total * 100).toFixed(1)}% loaded`);
+            }
+        },
+        err => {
+            console.error("OBJ load FAILED:", err);
+            document.getElementById("status").innerText =
+                "Failed to load model. Check console.";
+        }
+    );
+}
+
+
+function loadGLTF(path) {
+    const loader = new THREE.GLTFLoader();
+    loader.load(path, gltf => {
+        setRootObject(gltf.scene);
+    });
+}
+
+function loadSTL(path) {
+    const loader = new THREE.STLLoader();
+    loader.load(path, geometry => {
+        geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ffff, metalness: 0.2, roughness: 0.5 });
+        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        setRootObject(group);
+    });
+}
+
+function loadPLY(path) {
+    const loader = new THREE.PLYLoader();
+    loader.load(path, geometry => {
+        geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, metalness: 0.1, roughness: 0.6 });
+        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        setRootObject(group);
+    });
+}
+
+// ------------- AUTO-FIT & PEEL -------------
+function autoFit(object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    object.position.sub(center);  // center at origin
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fitSize = 1.2;
+    baseScale = fitSize / maxDim;
+    object.scale.setScalar(baseScale);
+}
+
+function buildPeelLayers(object) {
+    peelLayers = [];
+    const box = new THREE.Box3();
+    const size = new THREE.Vector3();
+
+    object.traverse(child => {
+        if (child.isMesh) {
+            box.setFromObject(child);
+            box.getSize(size);
+            const radius = size.length();
+            peelLayers.push({ mesh: child, radius });
+        }
+    });
+
+    peelLayers.sort((a, b) => b.radius - a.radius);
+}
+
+function applyPeel(peelValue) {
+    if (peelLayers.length === 0) return;
+
+    const level = Math.round(
+        THREE.MathUtils.clamp(peelValue, 0, 1) * (peelLayers.length - 1)
+    );
+
+    peelLayers.forEach((layer, idx) => {
+        layer.mesh.visible = idx >= level;
+    });
+}
+function loadPreset(name) {
+    document.getElementById("status").innerText = "Loading " + name + "...";
+
+    if (name === "corridor") {
+        loadOBJ("/static/models/Corridor.obj");
+    }
+    else if (name === "working") {
+        loadOBJ("/static/models/Working.obj");
+    }
+    else if (name === "objfile") {
+        loadOBJ("/static/models/objfile.obj");
+    }
+}
+
+init3D();

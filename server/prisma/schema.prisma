@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   @default("student") // admin, educator, student
+  createdAt DateTime @default(now())
+  labs      SimulationLab[]
+  logs      Log[]
+}
+
+model SimulationLab {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  domainType  String   // e.g., 'aerospace', 'medical'
+  createdAt   DateTime @default(now())
+  createdBy   String
+  user        User     @relation(fields: [createdBy], references: [id])
+  assets      Asset[]
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  name        String
+  storageUrl  String
+  labId       String
+  lab         SimulationLab @relation(fields: [labId], references: [id])
+  peelLayers  PeelLayer[]
+}
+
+model PeelLayer {
+  id          String   @id @default(uuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  depthLevel  Int      // The peel value range (e.g. 0 to 100 representing layer depth)
+  partName    String
+  description String
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  message   String
+  level     String   @default("INFO") // INFO, WARN, ERROR, SUCCESS
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+}

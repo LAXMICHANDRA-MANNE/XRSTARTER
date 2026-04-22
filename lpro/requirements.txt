@@ -1,0 +1,7 @@
+Flask==3.0.2
+opencv-python
+mediapipe
+numpy
+PyOpenGL
+pybullet
+tensorflow
