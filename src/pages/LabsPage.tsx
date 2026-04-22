@@ -21,13 +21,20 @@ const LabsPage: React.FC = () => {
   useEffect(() => {
     // Start browser camera for user-side viewing
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
+      console.log("Requesting Browser Camera...");
+      navigator.mediaDevices.getUserMedia({ 
+        video: { width: 640, height: 480 } 
+      })
         .then(stream => {
+          console.log("Camera Stream Granted!");
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(e => console.error("Video Play Error:", e));
           }
         })
-        .catch(err => console.error("Browser Camera Error:", err));
+        .catch(err => {
+          console.error("Browser Camera Permission Denied or Error:", err);
+        });
     }
 
     // Start remote camera (fallback/legacy)
