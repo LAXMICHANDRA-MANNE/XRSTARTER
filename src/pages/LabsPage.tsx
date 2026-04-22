@@ -18,8 +18,15 @@ const LabsPage: React.FC = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraStatus, setCameraStatus] = useState<'requesting' | 'active' | 'denied' | 'error'>('requesting');
+  const isProd = import.meta.env.PROD;
 
   const startBrowserCamera = () => {
+    // Only use browser camera in production (cloud)
+    if (!isProd) {
+      setCameraStatus('active');
+      return;
+    }
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       setCameraStatus('requesting');
       navigator.mediaDevices.getUserMedia({ 
@@ -42,7 +49,7 @@ const LabsPage: React.FC = () => {
   useEffect(() => {
     startBrowserCamera();
 
-    // Start remote camera (fallback/legacy)
+    // Start remote camera (works both locally and in cloud)
     fetch(`${API_URLS.PYTHON_ENGINE}/start_camera`, { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
 
     return () => {
@@ -204,15 +211,23 @@ const LabsPage: React.FC = () => {
         dragConstraints={containerRef}
         className="absolute bottom-8 right-8 z-50 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50 bg-white/30 backdrop-blur-md cursor-grab active:cursor-grabbing pointer-events-auto"
       >
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted 
-          className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
-        />
+        {!isProd ? (
+          <img 
+            src={`${API_URLS.PYTHON_ENGINE}/video_feed`} 
+            alt="Local Camera Feed" 
+            className="w-full h-full object-cover pointer-events-none" 
+          />
+        ) : (
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted 
+            className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
+          />
+        )}
         
-        {cameraStatus !== 'active' && (
+        {isProd && cameraStatus !== 'active' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 p-4 text-center">
             <p className="text-white text-xs font-bold mb-2">
               {cameraStatus === 'requesting' ? 'Requesting Camera...' : 
