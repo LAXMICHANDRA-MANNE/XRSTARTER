@@ -18,6 +18,8 @@ export interface GestureState {
   rot_z?: number;
 }
 
+import { API_URLS } from '../config';
+
 export function useGestureEngine() {
   const [gesture, setGesture] = useState<GestureState>({
     scale: 1,
@@ -39,7 +41,7 @@ export function useGestureEngine() {
     
     async function fetchStatus() {
       try {
-        const res = await fetch('/status');
+        const res = await fetch(`${API_URLS.PYTHON_ENGINE}/status`);
         if (res.ok) {
           const data = await res.json();
           setGesture(data);

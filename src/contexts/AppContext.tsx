@@ -22,11 +22,13 @@ export const useApp = () => {
   return context;
 };
 
+import { API_URLS } from '../config';
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
   React.useEffect(() => {
-    fetch('/api/user')
+    fetch(`${API_URLS.PYTHON_ENGINE}/api/user`)
       .then(res => res.json())
       .then(data => {
          if (!data.error) {

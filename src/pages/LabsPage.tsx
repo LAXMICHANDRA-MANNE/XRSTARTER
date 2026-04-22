@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { FlaskConical, UploadCloud, Layers, Cpu } from 'lucide-react';
 
+import { API_URLS } from '../config';
+
 const LabsPage: React.FC = () => {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('Spatial Object');
@@ -17,11 +19,11 @@ const LabsPage: React.FC = () => {
 
   useEffect(() => {
     // Start camera when entering Labs page
-    fetch('/start_camera', { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
+    fetch(`${API_URLS.PYTHON_ENGINE}/start_camera`, { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
 
     return () => {
       // Stop camera when leaving Labs page
-      fetch('/stop_camera', { method: 'POST' }).catch(e => console.error("Camera Stop Error:", e));
+      fetch(`${API_URLS.PYTHON_ENGINE}/stop_camera`, { method: 'POST' }).catch(e => console.error("Camera Stop Error:", e));
     };
   }, []);
 
@@ -38,12 +40,12 @@ const LabsPage: React.FC = () => {
       fd.append("objfile", file);
 
       try {
-        const res = await fetch("/upload", { method: "POST", body: fd });
+        const res = await fetch(`${API_URLS.PYTHON_ENGINE}/upload`, { method: "POST", body: fd });
         const data = await res.json();
         
         // Command the iframe headless viewer to load the uploaded file!
         if (data.path && iframeRef.current?.contentWindow) {
-          const relPath = "/uploads/" + data.path;
+          const relPath = `${API_URLS.PYTHON_ENGINE}/uploads/` + data.path;
           console.log("Sending LOAD_MODEL to lpro viewer:", relPath);
           iframeRef.current.contentWindow.postMessage({ type: 'LOAD_MODEL', path: relPath }, '*');
           
@@ -62,7 +64,7 @@ const LabsPage: React.FC = () => {
   useEffect(() => {
     async function fetchLayerContext() {
       try {
-        const res = await fetch(`/api/metadata/current_asset`);
+        const res = await fetch(`${API_URLS.NODE_BACKEND}/api/metadata/current_asset`);
         const data = await res.json();
         
         if (data.layers) {
@@ -109,7 +111,7 @@ const LabsPage: React.FC = () => {
     try {
       const currentObject = overrideName || fileName || layerData?.partName || 'unknown 3D object';
 
-      const response = await fetch("/api/analyze", {
+      const response = await fetch(`${API_URLS.PYTHON_ENGINE}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,7 +167,7 @@ const LabsPage: React.FC = () => {
       <div className="absolute inset-0 z-0">
           <iframe 
              ref={iframeRef} 
-             src="http://127.0.0.1:5000" 
+             src={API_URLS.PYTHON_ENGINE} 
              className="w-full h-full border-none pointer-events-none" 
              title="LPRO Headless Physics Viewer"
           />
@@ -179,7 +181,7 @@ const LabsPage: React.FC = () => {
         dragConstraints={containerRef}
         className="absolute bottom-8 right-8 z-50 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50 bg-white/30 backdrop-blur-md cursor-grab active:cursor-grabbing pointer-events-auto"
       >
-        <img src="/video_feed" alt="Camera Feed" className="w-full h-full object-cover pointer-events-none" />
+        <img src={`${API_URLS.PYTHON_ENGINE}/video_feed`} alt="Camera Feed" className="w-full h-full object-cover pointer-events-none" />
         <div className="absolute bottom-2 left-2 bg-white/70 backdrop-blur-md px-2 py-1 rounded-md flex items-center text-xs text-gray-900 font-medium border border-white/40 shadow-sm">
           <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
           Camera Active

@@ -76,6 +76,8 @@ function Model({ url, gesture }: { url: string; gesture: any }) {
   return <primitive ref={modelRef} object={scene} />;
 }
 
+import { API_URLS } from '../config';
+
 export default function XRViewer({ fileUrl, onPeelChange, arMode = false, className = "relative w-full h-[600px] rounded-xl overflow-hidden" }: { fileUrl: string | null; onPeelChange: (peel: number) => void; arMode?: boolean; className?: string }) {
   const gesture = useGestureEngine();
 
@@ -91,7 +93,7 @@ export default function XRViewer({ fileUrl, onPeelChange, arMode = false, classN
   return (
     <div className={className}>
       {arMode && (
-         <img src="/video_feed" alt="Live Camera" className="absolute inset-0 w-full h-full object-cover -z-10" />
+         <img src={`${API_URLS.PYTHON_ENGINE}/video_feed`} alt="Live Camera" className="absolute inset-0 w-full h-full object-cover -z-10" />
       )}
       {!fileUrl ? (
         <div className="flex flex-col items-center justify-center h-full text-center p-6">

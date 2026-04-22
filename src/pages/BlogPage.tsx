@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useInView } from 'react-intersection-observer';
 
+import { API_URLS } from '../config';
+
 const BlogPage: React.FC = () => {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +35,7 @@ const BlogPage: React.FC = () => {
   const [researchPapers, setResearchPapers] = useState<any[]>([]);
 
   React.useEffect(() => {
-    fetch('/api/research')
+    fetch(`${API_URLS.PYTHON_ENGINE}/api/research`)
       .then(res => res.json())
       .then(data => {
          // Exclude the featured paper from the general list feed
