@@ -17,31 +17,35 @@ const LabsPage: React.FC = () => {
   const containerRef = useRef(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraStatus, setCameraStatus] = useState<'requesting' | 'active' | 'denied' | 'error'>('requesting');
 
-  useEffect(() => {
-    // Start browser camera for user-side viewing
+  const startBrowserCamera = () => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      console.log("Requesting Browser Camera...");
+      setCameraStatus('requesting');
       navigator.mediaDevices.getUserMedia({ 
         video: { width: 640, height: 480 } 
       })
         .then(stream => {
-          console.log("Camera Stream Granted!");
+          setCameraStatus('active');
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             videoRef.current.play().catch(e => console.error("Video Play Error:", e));
           }
         })
         .catch(err => {
-          console.error("Browser Camera Permission Denied or Error:", err);
+          console.error("Browser Camera Error:", err);
+          setCameraStatus(err.name === 'NotAllowedError' ? 'denied' : 'error');
         });
     }
+  };
+
+  useEffect(() => {
+    startBrowserCamera();
 
     // Start remote camera (fallback/legacy)
     fetch(`${API_URLS.PYTHON_ENGINE}/start_camera`, { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
 
     return () => {
-      // Stop camera when leaving Labs page
       fetch(`${API_URLS.PYTHON_ENGINE}/stop_camera`, { method: 'POST' }).catch(e => console.error("Camera Stop Error:", e));
     };
   }, []);
@@ -200,10 +204,32 @@ const LabsPage: React.FC = () => {
         dragConstraints={containerRef}
         className="absolute bottom-8 right-8 z-50 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50 bg-white/30 backdrop-blur-md cursor-grab active:cursor-grabbing pointer-events-auto"
       >
-        <img src={`${API_URLS.PYTHON_ENGINE}/video_feed`} alt="Camera Feed" className="w-full h-full object-cover pointer-events-none" />
+        <video 
+          ref={videoRef} 
+          autoPlay 
+          playsInline 
+          muted 
+          className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
+        />
+        
+        {cameraStatus !== 'active' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 p-4 text-center">
+            <p className="text-white text-xs font-bold mb-2">
+              {cameraStatus === 'requesting' ? 'Requesting Camera...' : 
+               cameraStatus === 'denied' ? 'Camera Blocked!' : 'Camera Error'}
+            </p>
+            <button 
+              onClick={startBrowserCamera}
+              className="px-3 py-1 bg-white text-black text-[10px] font-black rounded-full hover:bg-emerald-400 transition-colors"
+            >
+              RESTART CAMERA
+            </button>
+          </div>
+        )}
+
         <div className="absolute bottom-2 left-2 bg-white/70 backdrop-blur-md px-2 py-1 rounded-md flex items-center text-xs text-gray-900 font-medium border border-white/40 shadow-sm">
-          <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
-          Camera Active
+          <div className={`w-2 h-2 rounded-full mr-2 ${cameraStatus === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+          {cameraStatus === 'active' ? 'Camera Active' : 'Camera Offline'}
         </div>
       </motion.div>
 
