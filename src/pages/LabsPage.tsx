@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FlaskConical, UploadCloud, Layers, Cpu } from 'lucide-react';
 
 import { API_URLS } from '../config';
+import { useGestureEngine } from '../hooks/useGestureEngine';
 
 const LabsPage: React.FC = () => {
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -20,13 +21,28 @@ const LabsPage: React.FC = () => {
   const [cameraStatus, setCameraStatus] = useState<'requesting' | 'active' | 'denied' | 'error'>('requesting');
   const isProd = import.meta.env.PROD;
 
-  const startBrowserCamera = () => {
-    // Only use browser camera in production (cloud)
-    if (!isProd) {
-      setCameraStatus('active');
-      return;
-    }
+  const gestureState = useGestureEngine(videoRef, true); // Track gestures locally
 
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'UPDATE_STATE',
+        state: gestureState
+      }, '*');
+    }
+    
+    if (gestureState.action === 'crush') {
+      setFileUrl(null);
+      iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+    }
+    if (gestureState.action === 'double_tap') {
+      setAiGenerating(true);
+      iframeRef.current?.contentWindow?.postMessage({ type: 'CAPTURE_SCREEN' }, '*');
+    }
+    setPeelValue(gestureState.peel);
+  }, [gestureState]);
+
+  const startBrowserCamera = () => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       setCameraStatus('requesting');
       navigator.mediaDevices.getUserMedia({ 
@@ -48,45 +64,25 @@ const LabsPage: React.FC = () => {
 
   useEffect(() => {
     startBrowserCamera();
-
-    // Start remote camera (works both locally and in cloud)
-    fetch(`${API_URLS.PYTHON_ENGINE}/start_camera`, { method: 'POST' }).catch(e => console.error("Camera Start Error:", e));
-
-    return () => {
-      fetch(`${API_URLS.PYTHON_ENGINE}/stop_camera`, { method: 'POST' }).catch(e => console.error("Camera Stop Error:", e));
-    };
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Create a blob URL for UI feedback (hides the center placeholder)
+      // Create a blob URL for UI feedback and pass it to the local Three.js iframe
       const uiUrl = URL.createObjectURL(file);
       setFileUrl(uiUrl);
       setFileName(file.name);
 
-      // Post the actual file to the Python lpro backend
-      const fd = new FormData();
-      fd.append("objfile", file);
-
-      try {
-        const res = await fetch(`${API_URLS.PYTHON_ENGINE}/upload`, { method: "POST", body: fd });
-        const data = await res.json();
+      if (iframeRef.current?.contentWindow) {
+        console.log("Sending LOAD_MODEL to lpro viewer:", uiUrl);
+        iframeRef.current.contentWindow.postMessage({ type: 'LOAD_MODEL', path: uiUrl, fileName: file.name }, '*');
         
-        // Command the iframe headless viewer to load the uploaded file!
-        if (data.path && iframeRef.current?.contentWindow) {
-          const relPath = `${API_URLS.PYTHON_ENGINE}/uploads/` + data.path;
-          console.log("Sending LOAD_MODEL to lpro viewer:", relPath);
-          iframeRef.current.contentWindow.postMessage({ type: 'LOAD_MODEL', path: relPath }, '*');
-          
-          setAiGenerating(true);
-          // Wait 2s for WebGL geometry to load before capturing screen for AI
-          setTimeout(() => {
-              iframeRef.current?.contentWindow?.postMessage({ type: 'CAPTURE_SCREEN' }, '*');
-          }, 2000);
-        }
-      } catch (err) {
-        console.error("Backend upload failed:", err);
+        setAiGenerating(true);
+        // Wait 2s for WebGL geometry to load before capturing screen for AI
+        setTimeout(() => {
+            iframeRef.current?.contentWindow?.postMessage({ type: 'CAPTURE_SCREEN' }, '*');
+        }, 2000);
       }
     }
   };
@@ -112,21 +108,8 @@ const LabsPage: React.FC = () => {
   // Listen for custom XR Actions from the LPRO iframe!
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-       if (e.data && e.data.type === 'XR_ACTION') {
-           if (e.data.action === 'crush') {
-               setFileUrl(null); // Return to default screen
-               iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
-           }
-           if (e.data.action === 'double_tap') {
-               setAiGenerating(true);
-               iframeRef.current?.contentWindow?.postMessage({ type: 'CAPTURE_SCREEN' }, '*');
-           }
-       }
        if (e.data && e.data.type === 'XR_SCREENSHOT') {
            generateAIReport('', e.data.image);
-       }
-       if (e.data && e.data.type === 'XR_PEEL') {
-           setPeelValue(e.data.peel);
        }
     };
     
@@ -197,7 +180,7 @@ const LabsPage: React.FC = () => {
       <div className="absolute inset-0 z-0">
           <iframe 
              ref={iframeRef} 
-             src={API_URLS.PYTHON_ENGINE} 
+             src={`${import.meta.env.BASE_URL}lpro-viewer.html`} 
              className="w-full h-full border-none pointer-events-none" 
              title="LPRO Headless Physics Viewer"
           />
@@ -211,23 +194,15 @@ const LabsPage: React.FC = () => {
         dragConstraints={containerRef}
         className="absolute bottom-8 right-8 z-50 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50 bg-white/30 backdrop-blur-md cursor-grab active:cursor-grabbing pointer-events-auto"
       >
-        {!isProd ? (
-          <img 
-            src={`${API_URLS.PYTHON_ENGINE}/video_feed`} 
-            alt="Local Camera Feed" 
-            className="w-full h-full object-cover pointer-events-none" 
-          />
-        ) : (
-          <video 
-            ref={videoRef} 
-            autoPlay 
-            playsInline 
-            muted 
-            className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
-          />
-        )}
+        <video 
+          ref={videoRef} 
+          autoPlay 
+          playsInline 
+          muted 
+          className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
+        />
         
-        {isProd && cameraStatus !== 'active' && (
+        {cameraStatus !== 'active' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 p-4 text-center">
             <p className="text-white text-xs font-bold mb-2">
               {cameraStatus === 'requesting' ? 'Requesting Camera...' : 

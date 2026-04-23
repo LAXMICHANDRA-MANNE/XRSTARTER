@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LPRO Headless XR Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Modern Three.js core + loaders from CDN for robust .GLB parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    overflow: hidden;
+    background: #000; /* Black Screen */
+}
+
+/* Animated Green Grid */
+#grid-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-size: 50px 50px;
+    background-image:
+        linear-gradient(to right, rgba(0, 255, 0, 0.15) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 255, 0, 0.15) 1px, transparent 1px);
+    animation: gridMove 15s linear infinite;
+}
+@keyframes gridMove {
+    from { background-position: 0 0; }
+    to   { background-position: 50px 50px; }
+}
+
+#viewer-wrapper {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+}
+#viewer {
+    width: 100%;
+    height: 100%;
+}
+#loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #00ffaa;
+    font-family: monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(0, 255, 170, 0.3);
+    border-top-color: #00ffaa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+@keyframes spin { 
+    to { transform: rotate(360deg); } 
+}
+</style>
+</head>
+<body>
+
+<div id="grid-overlay"></div>
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text">Parsing 3D Asset...</div>
+</div>
+<div id="viewer-wrapper">
+    <div id="viewer"></div>
+</div>
+
+<script>
+let scene, camera, renderer;
+let rootObject = null;
+let baseScale = 1.0;
+let peelLayers = [];
+let peelEnabled = true;
+
+// Gesture state variables received from parent window
+let targetState = {
+    scale: 1.0,
+    rotation_x: 0,
+    rotation_y: 0,
+    pan_x: 0,
+    pan_y: 0,
+    peel: 0
+};
+
+// ------------- INIT 3D -------------
+function init3D() {
+    scene = new THREE.Scene();
+
+    const viewer = document.getElementById("viewer");
+    const aspect = viewer.clientWidth / viewer.clientHeight;
+
+    camera = new THREE.PerspectiveCamera(60, aspect, 0.01, 1000);
+    camera.position.set(0, 0.5, 3);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    renderer.setClearColor(0x000000, 0); // Transparent to match React glass!
+    viewer.appendChild(renderer.domElement);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
+
+    const amb = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(amb);
+
+    window.addEventListener("resize", onWindowResize);
+
+    requestAnimationFrame(loop);
+}
+
+function onWindowResize() {
+    const viewer = document.getElementById("viewer");
+    camera.aspect = viewer.clientWidth / viewer.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+}
+
+// ------------- MAIN LOOP -------------
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function loop() {
+    if (rootObject) {
+        // zoom (scale)
+        const scaleFactor = Math.max(0.4, Math.min(3.0, targetState.scale));
+        rootObject.scale.setScalar(baseScale * scaleFactor);
+
+        // rotation
+        rootObject.rotation.x = lerp(rootObject.rotation.x, targetState.rotation_x, 0.1);
+        rootObject.rotation.y = lerp(rootObject.rotation.y, targetState.rotation_y, 0.1);
+
+        // peel layers
+        if (peelEnabled) applyPeel(targetState.peel);
+
+        // pan
+        let nx = targetState.pan_x * 5;
+        let ny = -targetState.pan_y * 5;
+        // Clamp to screen bounds
+        nx = Math.max(-3.5, Math.min(3.5, nx));
+        ny = Math.max(-2.5, Math.min(2.5, ny));
+        rootObject.position.x = lerp(rootObject.position.x, nx, 0.1);
+        rootObject.position.y = lerp(rootObject.position.y, ny, 0.1);
+    }
+    
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+}
+
+// ------------- IPC MESSAGE LISTENER -------------
+window.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "LOAD_MODEL") {
+        console.log("Headless Viewer Received LOAD request:", event.data.path);
+        document.getElementById('loading-overlay').style.display = 'flex';
+        // Small timeout to allow the browser to render the loading screen before parsing blocks the thread
+        setTimeout(() => {
+            loadModelByExtension(event.data.path, event.data.fileName);
+        }, 100);
+    }
+    if (event.data && event.data.type === "RESET") {
+        if(rootObject) scene.remove(rootObject);
+        rootObject = null;
+    }
+    if (event.data && event.data.type === "CAPTURE_SCREEN") {
+        // Force a render step just in case so the buffer isn't clear
+        renderer.render(scene, camera);
+        // Scrape the raw pixel data from WebGL core
+        const dataUrl = renderer.domElement.toDataURL("image/jpeg", 0.8);
+        window.parent.postMessage({ type: 'XR_SCREENSHOT', image: dataUrl }, '*');
+    }
+    if (event.data && event.data.type === "UPDATE_STATE") {
+        targetState = {
+            ...targetState,
+            ...event.data.state
+        };
+    }
+});
+
+// ------------- DISPATCH LOADER BY EXTENSION -------------
+function loadModelByExtension(path, fileName) {
+    const ext = fileName ? fileName.split(".").pop().toLowerCase() : path.split(".").pop().toLowerCase();
+
+    if (ext === "obj") {
+        loadOBJ(path);
+    } else if (ext === "gltf" || ext === "glb") {
+        loadGLTF(path);
+    } else if (ext === "stl") {
+        loadSTL(path);
+    } else if (ext === "ply") {
+        loadPLY(path);
+    } else {
+        console.error("Unsupported format: " + ext);
+    }
+}
+
+// ------------- SHARED: SET ROOT OBJECT -------------
+function setRootObject(object3D) {
+    if (rootObject) scene.remove(rootObject);
+    rootObject = object3D;
+
+    // normalize materials + normals
+    rootObject.traverse(child => {
+        if (child.isMesh) {
+            if (!child.material) {
+                child.material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+            }
+            child.material.side = THREE.DoubleSide;
+            if(!child.geometry.hasAttribute('normal')) {
+               child.geometry.computeVertexNormals();
+            }
+        }
+    });
+
+    // center + scale
+    autoFit(rootObject);
+    rootObject.position.set(0, 0, 0);
+    rootObject.rotation.set(0, 0, 0);
+
+    // build peel layers
+    buildPeelLayers(rootObject);
+
+    scene.add(rootObject);
+    console.log("Model loaded successfully inside iframe!");
+    document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// ------------- LOADERS -------------
+function loadOBJ(path) {
+    const loader = new THREE.OBJLoader();
+    loader.load(path, obj => {
+        setRootObject(obj);
+    });
+}
+
+function loadGLTF(path) {
+    const loader = new THREE.GLTFLoader();
+    loader.load(path, gltf => {
+        setRootObject(gltf.scene);
+    });
+}
+
+function loadSTL(path) {
+    const loader = new THREE.STLLoader();
+    loader.load(path, geometry => {
+        if(!geometry.hasAttribute('normal')) geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ffff, metalness: 0.2, roughness: 0.5 });
+        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        setRootObject(group);
+    });
+}
+
+function loadPLY(path) {
+    const loader = new THREE.PLYLoader();
+    loader.load(path, geometry => {
+        if(!geometry.hasAttribute('normal')) geometry.computeVertexNormals();
+        const material = new THREE.MeshStandardMaterial({ color: 0x00ff88, metalness: 0.1, roughness: 0.6 });
+        const mesh = new THREE.Mesh(geometry, material);
+        const group = new THREE.Group();
+        group.add(mesh);
+        setRootObject(group);
+    });
+}
+
+// ------------- AUTO-FIT & PEEL -------------
+function autoFit(object) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    object.position.sub(center);  // center at origin
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fitSize = 1.2;
+    baseScale = (maxDim > 0.0001) ? (fitSize / maxDim) : 1.0;
+    object.scale.setScalar(baseScale);
+}
+
+function buildPeelLayers(object) {
+    peelLayers = [];
+    const box = new THREE.Box3();
+    const size = new THREE.Vector3();
+
+    object.traverse(child => {
+        if (child.isMesh) {
+            box.setFromObject(child);
+            box.getSize(size);
+            const radius = size.length();
+            peelLayers.push({ mesh: child, radius });
+            
+            // support transparency for peel
+            child.material.transparent = true;
+            child.material.needsUpdate = true;
+        }
+    });
+
+    peelLayers.sort((a, b) => b.radius - a.radius);
+}
+
+function applyPeel(peelValue) {
+    if (peelLayers.length === 0) return;
+
+    peelLayers.forEach((layer, idx) => {
+        if (peelValue > 0) {
+             const fade = Math.max(0.1, 1.0 - peelValue);
+             layer.mesh.material.opacity = fade;
+        } else {
+             layer.mesh.material.opacity = 1.0;
+        }
+    });
+}
+
+// ------------- START -------------
+init3D();
+</script>
+</body>
+</html>

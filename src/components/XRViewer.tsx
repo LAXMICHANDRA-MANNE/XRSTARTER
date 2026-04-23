@@ -55,8 +55,8 @@ function Model({ url, gesture }: { url: string; gesture: any }) {
     if (modelRef.current) {
       if (gesture.action !== 'shush') {
           // Trackball logic ONLY applies to rotation around natural center.
-          modelRef.current.rotation.x = THREE.MathUtils.lerp(modelRef.current.rotation.x, gesture.cum_rot_x, 0.1);
-          modelRef.current.rotation.y = THREE.MathUtils.lerp(modelRef.current.rotation.y, gesture.cum_rot_y, 0.1);
+          modelRef.current.rotation.x = THREE.MathUtils.lerp(modelRef.current.rotation.x, gesture.rotation_x, 0.1);
+          modelRef.current.rotation.y = THREE.MathUtils.lerp(modelRef.current.rotation.y, gesture.rotation_y, 0.1);
       }
 
       scene.traverse((child) => {

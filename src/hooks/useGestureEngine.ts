@@ -1,59 +1,225 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Hands, Results, Landmark } from '@mediapipe/hands';
+import { Camera } from '@mediapipe/camera_utils';
 
 export interface GestureState {
   scale: number;
-  rotation: number;
+  rotation_x: number;
+  rotation_y: number;
+  pan_x: number;
+  pan_y: number;
   peel: number;
-  drag_active: boolean;
-  drag_x: number;
-  drag_y: number;
   action: string | null;
-  action_payload: any;
-  cum_rot_x: number;
-  cum_rot_y: number;
-  cum_pan_x: number;
-  cum_pan_y: number;
-  rot_x?: number;
-  rot_y?: number;
-  rot_z?: number;
 }
 
-import { API_URLS } from '../config';
+const PARAMS = {
+  zoom_min: 0.7,
+  zoom_max: 5.0,
+  zoom_sensitivity: 0.65,
+  drag_smooth: 0.55,
+  smooth_alpha: 0.90,
+};
 
-export function useGestureEngine() {
-  const [gesture, setGesture] = useState<GestureState>({
-    scale: 1,
-    rotation: 0,
+export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, isProd: boolean = true) => {
+  const [gestureState, setGestureState] = useState<GestureState>({
+    scale: 1.0,
+    rotation_x: 0,
+    rotation_y: 0,
+    pan_x: 0,
+    pan_y: 0,
     peel: 0,
-    drag_active: false,
-    drag_x: 0.5,
-    drag_y: 0.5,
-    action: null,
-    action_payload: {},
+    action: null
+  });
+
+  const stateRef = useRef({
+    scale: 1.0,
     cum_rot_x: 0,
     cum_rot_y: 0,
     cum_pan_x: 0,
-    cum_pan_y: 0
+    cum_pan_y: 0,
+    peel: 0,
+    base_right_pinch: null as number | null,
+    is_rotating: false,
+    last_rot_x: 0.5,
+    last_rot_y: 0.5,
+    is_panning: false,
+    last_pan_x: 0.5,
+    last_pan_y: 0.5,
+    drag_active: false,
+    drag_x: 0.5,
+    drag_y: 0.5,
+    tap_count: 0,
+    last_tap_time: 0,
+    last_action_time: 0
   });
 
-  useEffect(() => {
-    let interval: any;
-    
-    async function fetchStatus() {
-      try {
-        const res = await fetch(`${API_URLS.PYTHON_ENGINE}/status`);
-        if (res.ok) {
-          const data = await res.json();
-          setGesture(data);
-        }
-      } catch (err) {
-        // silently ignore polling errors to not flood console
-      }
+  const handsRef = useRef<Hands | null>(null);
+  const cameraRef = useRef<Camera | null>(null);
+
+  const calculateDistance = (p1: Landmark, p2: Landmark) => {
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const isFingerUp = (hand: Landmark[], tip: number, pip: number) => {
+    return hand[tip].y < hand[pip].y;
+  };
+
+  const onResults = useCallback((results: Results) => {
+    let left: Landmark[] | null = null;
+    let right: Landmark[] | null = null;
+
+    if (results.multiHandLandmarks && results.multiHandedness) {
+      results.multiHandedness.forEach((handedness, idx) => {
+        if (handedness.label === 'Right') left = results.multiHandLandmarks[idx];
+        else if (handedness.label === 'Left') right = results.multiHandLandmarks[idx];
+      });
     }
 
-    interval = setInterval(fetchStatus, 50); // poll every 50ms for low latency
-    return () => clearInterval(interval);
+    const s = stateRef.current;
+    const t_now = Date.now() / 1000;
+    
+    let newScale = s.scale;
+    let newPeel = s.peel;
+    let detected_action: string | null = null;
+
+    if (left) {
+      const middle = left[12];
+      const palm = left[9];
+      const openness = middle.y - palm.y;
+      const openness_norm = (0.30 - openness) / 0.30;
+      newPeel = Math.max(0, Math.min(1, openness_norm));
+
+      const pinchDist = calculateDistance(left[8], left[4]);
+      if (pinchDist < 0.05) {
+        if (!s.is_panning) {
+          s.is_panning = true;
+          s.last_pan_x = left[8].x;
+          s.last_pan_y = left[8].y;
+        } else {
+          s.cum_pan_x += (left[8].x - s.last_pan_x) * 2.5;
+          s.cum_pan_y += (left[8].y - s.last_pan_y) * 2.5;
+          s.last_pan_x = left[8].x;
+          s.last_pan_y = left[8].y;
+        }
+      } else {
+        s.is_panning = false;
+      }
+    } else {
+      s.is_panning = false;
+    }
+
+    let r_closed = false;
+    if (right) {
+      const dist = calculateDistance(right[8], right[4]);
+      
+      if (s.base_right_pinch === null) s.base_right_pinch = dist;
+      
+      let pinch_ratio = dist / s.base_right_pinch;
+      pinch_ratio = Math.max(PARAMS.zoom_min, Math.min(PARAMS.zoom_max, pinch_ratio));
+      newScale = ((1 - PARAMS.zoom_sensitivity) * s.scale + PARAMS.zoom_sensitivity * pinch_ratio);
+
+      const r_th = isFingerUp(right, 4, 3);
+      const r_i = isFingerUp(right, 8, 6);
+      const r_m = isFingerUp(right, 12, 10);
+      const r_r = isFingerUp(right, 16, 14);
+      const r_p = isFingerUp(right, 20, 18);
+      
+      r_closed = !r_th && !r_i && !r_m && !r_r && !r_p;
+
+      if (dist < 0.05) {
+        if (!s.is_rotating) {
+          s.is_rotating = true;
+          s.last_rot_x = right[8].x;
+          s.last_rot_y = right[8].y;
+
+          if (t_now - s.last_tap_time < 0.6) {
+            s.tap_count += 1;
+            if (s.tap_count === 2) {
+              detected_action = "double_tap";
+              s.tap_count = 0;
+            }
+          } else {
+            s.tap_count = 1;
+          }
+          s.last_tap_time = t_now;
+        } else {
+          s.cum_rot_x += (right[8].y - s.last_rot_y) * 3.5;
+          s.cum_rot_y += (right[8].x - s.last_rot_x) * 3.5;
+          s.last_rot_x = right[8].x;
+          s.last_rot_y = right[8].y;
+        }
+      } else {
+        s.is_rotating = false;
+      }
+
+      if (r_closed && t_now - s.last_action_time > 2.0) {
+        detected_action = "crush";
+        s.last_action_time = t_now;
+      }
+    } else {
+      s.base_right_pinch = null;
+      r_closed = false;
+      s.is_rotating = false;
+    }
+
+    if (detected_action) {
+      s.last_action_time = t_now;
+    }
+
+    const alpha = PARAMS.smooth_alpha;
+    s.scale = (1 - alpha) * s.scale + alpha * newScale;
+    s.peel = (1 - alpha) * s.peel + alpha * newPeel;
+
+    setGestureState({
+      scale: s.scale,
+      rotation_x: s.cum_rot_x,
+      rotation_y: s.cum_rot_y,
+      pan_x: s.cum_pan_x,
+      pan_y: s.cum_pan_y,
+      peel: s.peel,
+      action: detected_action
+    });
+
   }, []);
 
-  return gesture;
-}
+  useEffect(() => {
+    // MediaPipe uses the video element locally.
+    if (!videoRef?.current) return;
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults(onResults);
+    handsRef.current = hands;
+
+    const camera = new Camera(videoRef.current, {
+      onFrame: async () => {
+        if (videoRef.current && handsRef.current) {
+          await handsRef.current.send({ image: videoRef.current });
+        }
+      },
+      width: 640,
+      height: 480
+    });
+
+    camera.start();
+    cameraRef.current = camera;
+
+    return () => {
+      camera.stop();
+      hands.close();
+    };
+  }, [videoRef, isProd, onResults]);
+
+  return gestureState;
+};
