@@ -6,6 +6,7 @@ export interface GestureState {
   scale: number;
   rotation_x: number;
   rotation_y: number;
+  rotation_z: number;
   pan_x: number;
   pan_y: number;
   peel: number;
@@ -25,6 +26,7 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
     scale: 1.0,
     rotation_x: 0,
     rotation_y: 0,
+    rotation_z: 0,
     pan_x: 0,
     pan_y: 0,
     peel: 0,
@@ -35,6 +37,7 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
     scale: 1.0,
     cum_rot_x: 0,
     cum_rot_y: 0,
+    cum_rot_z: 0,
     cum_pan_x: 0,
     cum_pan_y: 0,
     peel: 0,
@@ -42,6 +45,7 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
     is_rotating: false,
     last_rot_x: 0.5,
     last_rot_y: 0.5,
+    last_angle: 0,
     is_panning: false,
     last_pan_x: 0.5,
     last_pan_y: 0.5,
@@ -52,6 +56,10 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
     last_tap_time: 0,
     last_action_time: 0
   });
+
+  const calculateAngle = (p1: Landmark, p2: Landmark) => {
+    return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+  };
 
   const handsRef = useRef<Hands | null>(null);
   const cameraRef = useRef<Camera | null>(null);
@@ -115,6 +123,7 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
     let r_closed = false;
     if (right) {
       const dist = calculateDistance(right[8], right[4]);
+      const angle = calculateAngle(right[4], right[8]);
       
       if (s.base_right_pinch === null) s.base_right_pinch = dist;
       
@@ -130,11 +139,12 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
       
       r_closed = !r_th && !r_i && !r_m && !r_r && !r_p;
 
-      if (dist < 0.05) {
+      if (dist < 0.06) {
         if (!s.is_rotating) {
           s.is_rotating = true;
           s.last_rot_x = right[8].x;
           s.last_rot_y = right[8].y;
+          s.last_angle = angle;
 
           if (t_now - s.last_tap_time < 0.6) {
             s.tap_count += 1;
@@ -147,11 +157,19 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
           }
           s.last_tap_time = t_now;
         } else {
-          s.cum_rot_x += (right[8].y - s.last_rot_y) * 3.5;
+          s.cum_rot_x += (right[8].y - s.last_rot_y) * 4.5;
           // Invert X rotation because camera is not mirrored
-          s.cum_rot_y -= (right[8].x - s.last_rot_x) * 3.5;
+          s.cum_rot_y -= (right[8].x - s.last_rot_x) * 4.5;
+          
+          // Rotation Z (Roll)
+          const angleDiff = angle - s.last_angle;
+          if (Math.abs(angleDiff) < 1.0) { // Filter out jumpy values
+            s.cum_rot_z += angleDiff * 2.0;
+          }
+          
           s.last_rot_x = right[8].x;
           s.last_rot_y = right[8].y;
+          s.last_angle = angle;
         }
       } else {
         s.is_rotating = false;
@@ -179,6 +197,7 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
       scale: s.scale,
       rotation_x: s.cum_rot_x,
       rotation_y: s.cum_rot_y,
+      rotation_z: s.cum_rot_z,
       pan_x: s.cum_pan_x,
       pan_y: s.cum_pan_y,
       peel: s.peel,
