@@ -72,8 +72,9 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
 
     if (results.multiHandLandmarks && results.multiHandedness) {
       results.multiHandedness.forEach((handedness, idx) => {
-        if (handedness.label === 'Right') left = results.multiHandLandmarks[idx];
-        else if (handedness.label === 'Left') right = results.multiHandLandmarks[idx];
+        // Correct labels for non-mirrored camera
+        if (handedness.label === 'Left') left = results.multiHandLandmarks[idx];
+        else if (handedness.label === 'Right') right = results.multiHandLandmarks[idx];
       });
     }
 
@@ -98,7 +99,8 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
           s.last_pan_x = left[8].x;
           s.last_pan_y = left[8].y;
         } else {
-          s.cum_pan_x += (left[8].x - s.last_pan_x) * 2.5;
+          // Invert X because camera is not mirrored
+          s.cum_pan_x -= (left[8].x - s.last_pan_x) * 2.5;
           s.cum_pan_y += (left[8].y - s.last_pan_y) * 2.5;
           s.last_pan_x = left[8].x;
           s.last_pan_y = left[8].y;
@@ -146,7 +148,8 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
           s.last_tap_time = t_now;
         } else {
           s.cum_rot_x += (right[8].y - s.last_rot_y) * 3.5;
-          s.cum_rot_y += (right[8].x - s.last_rot_x) * 3.5;
+          // Invert X rotation because camera is not mirrored
+          s.cum_rot_y -= (right[8].x - s.last_rot_x) * 3.5;
           s.last_rot_x = right[8].x;
           s.last_rot_y = right[8].y;
         }

@@ -31,16 +31,36 @@ const LabsPage: React.FC = () => {
       }, '*');
     }
     
+    /* 
+       Disabled automatic crush reset to make objects stay longer.
+       The user now has to use keyboard 'delete' or 'del' to clear.
+    */
+    /*
     if (gestureState.action === 'crush') {
       setFileUrl(null);
       iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
     }
+    */
     if (gestureState.action === 'double_tap') {
       setAiGenerating(true);
       iframeRef.current?.contentWindow?.postMessage({ type: 'CAPTURE_SCREEN' }, '*');
     }
     setPeelValue(gestureState.peel);
   }, [gestureState]);
+
+  // Keyboard Delete Listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === 'delete' || key === 'backspace' || key === 'd') {
+        console.log("Keyboard Reset triggered");
+        setFileUrl(null);
+        iframeRef.current?.contentWindow?.postMessage({ type: 'RESET' }, '*');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const startBrowserCamera = () => {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -199,7 +219,7 @@ const LabsPage: React.FC = () => {
           autoPlay 
           playsInline 
           muted 
-          className={`w-full h-full object-cover pointer-events-none mirror ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
+          className={`w-full h-full object-cover pointer-events-none ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
         />
         
         {cameraStatus !== 'active' && (

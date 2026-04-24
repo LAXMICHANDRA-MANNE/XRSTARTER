@@ -9,14 +9,14 @@ import Stripe from 'stripe';
 const adapter = new PrismaBetterSqlite3({ url: 'file:./dev.db' });
 const prisma = new PrismaClient({ adapter });
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
 // Initialize Google Auth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'mock_google_id');
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
-  apiVersion: '2025-02-24.acacia',
+  apiVersion: '2026-03-25.dahlia',
 });
 
 // For Stripe Webhooks, we need raw body parsing
@@ -75,6 +75,10 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const user = await prisma.user.findFirst({ where: { email } });
     if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!user.password) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -245,7 +249,7 @@ app.post('/api/payments/webhook', async (req, res) => {
 
   // Handle the event
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session;
+    const session = event.data.object as any;
     const userId = session.client_reference_id;
     const customerId = session.customer as string;
 

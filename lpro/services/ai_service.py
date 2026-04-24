@@ -13,6 +13,9 @@ def api_analyze():
     
     prompt = f"Act as Irma, a professional AI learning assistant inside an XR simulator. You are looking at a screenshot of the user's XR simulation monitor natively rendering a 3D model called \"{object_name}\". Completely ignore the background GUI elements and focus exclusively on the 3D model in the center. Analyze this 3D model structurally and provide an insightful 2-sentence educational diagnostic of its components or nature based precisely on what you see in the provided image."
     
+    if not Config.GEMINI_API_KEY:
+        return jsonify({"analysis": f"[MOCK IRMA]: This appears to be a high-fidelity model of {object_name}. Its structural integrity suggests a complex internal architecture typical of advanced spatial assets."})
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={Config.GEMINI_API_KEY}"
     
     payload = {
