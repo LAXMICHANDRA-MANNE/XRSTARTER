@@ -10,8 +10,10 @@ model User {
   id        String   @id @default(uuid())
   username  String   @unique
   email     String   @unique
-  password  String
-  role      String   @default("student") // admin, educator, student
+  password           String?
+  role               String   @default("student") // admin, educator, student
+  subscriptionStatus String   @default("inactive")
+  stripeCustomerId   String?
   createdAt DateTime @default(now())
   labs      SimulationLab[]
   logs      Log[]

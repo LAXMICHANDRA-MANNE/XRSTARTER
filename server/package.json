@@ -20,7 +20,9 @@
     "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "stripe": "^22.0.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

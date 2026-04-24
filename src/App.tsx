@@ -16,14 +16,24 @@ import SignupPage from './pages/SignupPage';
 import DepartmentOpsPage from './pages/DepartmentOpsPage';
 import CoreAccessPage from './pages/CoreAccessPage';
 import SettingsPage from './pages/SettingsPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   
   // Start on 'home' regardless of auth status, or let them navigate freely
   const [currentPage, setCurrentPage] = useState('home');
 
   const renderCurrentPage = () => {
+    // If the URL has session_id or mockPaymentSuccess, set it to active (mocking client side)
+    if (window.location.search.includes('session_id') || window.location.search.includes('mockPaymentSuccess')) {
+      if (user && user.subscriptionStatus !== 'active') {
+         user.subscriptionStatus = 'active'; // In a real app, you'd fetch from backend
+      }
+    }
+
+    const needsSubscription = user?.role?.toUpperCase() === 'STUDENT' && user?.subscriptionStatus !== 'active';
+
     switch (currentPage) {
       case 'home':
         return <HomePage onLaunch={() => setCurrentPage(isAuthenticated ? 'dashboard' : 'login')} />;
@@ -32,7 +42,9 @@ function AppContent() {
       case 'signup':
         return <SignupPage onSwitchToLogin={() => setCurrentPage('login')} onSignupSuccess={() => setCurrentPage('login')} />;
       case 'labs':
-        return isAuthenticated ? <LabsPage /> : <LoginPage onSwitchToSignup={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('labs')} />;
+        if (!isAuthenticated) return <LoginPage onSwitchToSignup={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('labs')} />;
+        if (needsSubscription) return <SubscriptionPage onSuccess={() => setCurrentPage('labs')} onLogout={logout} />;
+        return <LabsPage />;
       case 'dashboard':
         return isAuthenticated ? <DashboardPage /> : <LoginPage onSwitchToSignup={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('dashboard')} />;
       case 'blog':
@@ -43,6 +55,8 @@ function AppContent() {
         return isAuthenticated ? <CoreAccessPage /> : <LoginPage onSwitchToSignup={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('data')} />;
       case 'settings':
         return isAuthenticated ? <SettingsPage /> : <LoginPage onSwitchToSignup={() => setCurrentPage('signup')} onLoginSuccess={() => setCurrentPage('settings')} />;
+      case 'subscription':
+        return <SubscriptionPage onSuccess={() => setCurrentPage('labs')} onLogout={logout} />;
       default:
         return <HomePage onLaunch={() => setCurrentPage(isAuthenticated ? 'dashboard' : 'login')} />;
     }

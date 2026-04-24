@@ -3,6 +3,7 @@ export interface User {
   username: string;
   email: string;
   role: string;
+  subscriptionStatus?: string;
 }
 
 export enum UserRole {

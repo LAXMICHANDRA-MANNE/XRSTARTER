@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Fingerprint, User, Mail, ArrowLeft, Building2, Terminal, Network, Code2, FlaskConical, AlertCircle } from 'lucide-react';
 import { UserRole } from '../types/auth';
+import { GoogleLogin } from '@react-oauth/google';
+import { useMsal } from "@azure/msal-react";
+import { API_URLS } from '../config';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SignupPageProps {
   onSwitchToLogin: () => void;
@@ -16,6 +20,9 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
     role: UserRole.STUDENT
   });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [error, setError] = useState('');
+  const { instance } = useMsal();
+  const { login } = useAuth();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +31,40 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
     setTimeout(() => {
       onSignupSuccess();
     }, 1500);
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setIsAuthenticating(true);
+    try {
+      const res = await fetch(`${API_URLS.NODE_BACKEND}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+      if (res.ok) {
+        login(formData.role);
+        onSignupSuccess();
+      } else {
+        setError("Google Registration failed");
+      }
+    } catch (e) {
+      setError("Network error during SSO");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setIsAuthenticating(true);
+    try {
+      await instance.loginPopup();
+      login(formData.role);
+      onSignupSuccess();
+    } catch (e) {
+      setError("Microsoft Registration failed");
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   const roleConfigs = [
@@ -54,6 +95,13 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
             <FlaskConical className="text-white w-5 h-5" />
           </div>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center text-red-400">
+            <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+            <p className="text-sm font-medium">{error}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
            
@@ -129,6 +177,33 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
             )}
           </button>
         </form>
+
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-800"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-neural-dark text-gray-500">Or register with</span>
+            </div>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+             <div className="flex justify-center bg-white/10 hover:bg-white/20 transition-colors rounded-xl py-2 cursor-pointer">
+               <GoogleLogin 
+                  onSuccess={handleGoogleSuccess} 
+                  onError={() => setError("Google SSO Failed")}
+                  type="icon"
+                  shape="circle"
+               />
+             </div>
+             <button 
+               onClick={handleMicrosoftLogin}
+               className="flex justify-center items-center bg-white/10 hover:bg-white/20 transition-colors rounded-xl py-2"
+             >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft" className="w-6 h-6" />
+             </button>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

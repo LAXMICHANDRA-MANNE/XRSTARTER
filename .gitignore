@@ -25,10 +25,10 @@ dist-ssr
 .env
 
 # Large Files & 3D Models (GitHub has 100MB limit)
-*.obj
-*.glb
-*.gltf
-*.mtl
+# *.obj
+# *.glb
+# *.gltf
+# *.mtl
 
 # Python Virtual Env & Cache
 lpro/gesture_env/

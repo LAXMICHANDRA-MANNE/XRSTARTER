@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import { Fingerprint, Lock, Mail, ArrowRight, ShieldAlert, FlaskConical } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
+import { GoogleLogin } from '@react-oauth/google';
+import { useMsal } from "@azure/msal-react";
+import { API_URLS } from '../config';
 
 interface LoginPageProps {
   onSwitchToSignup: () => void;
@@ -16,6 +19,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginSuccess 
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [error, setError] = useState('');
 
+  const { instance } = useMsal();
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
@@ -23,18 +28,69 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginSuccess 
 
     // Mock Authentication Logic connecting to RBAC
     setTimeout(() => {
-      // In a real startup, this goes to Prisma -> /api/login endpoints
       let assignedRole = UserRole.STUDENT;
-      
       if (email.includes('hod')) assignedRole = UserRole.HOD;
       else if (email.includes('admin')) assignedRole = UserRole.DATA_ADMIN;
       else if (email.includes('dev')) assignedRole = UserRole.CORE_DEV;
       else if (email.includes('principal')) assignedRole = UserRole.PRINCIPAL;
-      
-      login(assignedRole);
+
+      login({
+        id: Math.random().toString(36).substr(2, 9),
+        username: email.split('@')[0],
+        email: email,
+        role: assignedRole,
+        subscriptionStatus: 'active'
+      });
       setIsAuthenticating(false);
       onLoginSuccess();
     }, 1200);
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setIsAuthenticating(true);
+    try {
+      const res = await fetch(`${API_URLS.NODE_BACKEND}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        login({
+          id: data.id || 'google-user',
+          username: data.name || 'Google User',
+          email: data.email || '',
+          role: UserRole.STUDENT,
+          subscriptionStatus: 'active'
+        });
+        onLoginSuccess();
+      } else {
+        setError("Google Login failed");
+      }
+    } catch (e) {
+      setError("Network error during SSO");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleMicrosoftLogin = async () => {
+    setIsAuthenticating(true);
+    try {
+      await instance.loginPopup();
+      login({
+        id: 'ms-user',
+        username: 'Microsoft User',
+        email: 'ms@vce.edu',
+        role: UserRole.STUDENT,
+        subscriptionStatus: 'active'
+      });
+      onLoginSuccess();
+    } catch (e) {
+      setError("Microsoft Login failed");
+    } finally {
+      setIsAuthenticating(false);
+    }
   };
 
   return (
@@ -113,6 +169,33 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onLoginSuccess 
             )}
           </button>
         </form>
+
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-800"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-neural-dark text-gray-500">Or continue with</span>
+            </div>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-3">
+             <div className="flex justify-center bg-white/10 hover:bg-white/20 transition-colors rounded-xl py-2 cursor-pointer">
+               <GoogleLogin 
+                  onSuccess={handleGoogleSuccess} 
+                  onError={() => setError("Google SSO Failed")}
+                  type="icon"
+                  shape="circle"
+               />
+             </div>
+             <button 
+               onClick={handleMicrosoftLogin}
+               className="flex justify-center items-center bg-white/10 hover:bg-white/20 transition-colors rounded-xl py-2"
+             >
+                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" alt="Microsoft" className="w-6 h-6" />
+             </button>
+          </div>
+        </div>
 
         <div className="mt-8 pt-6 border-t border-gray-800 text-center">
           <p className="text-gray-400 text-sm">
