@@ -219,6 +219,7 @@ const LabsPage: React.FC = () => {
           autoPlay 
           playsInline 
           muted 
+          style={{ transform: 'scaleX(1)' }}
           className={`w-full h-full object-cover pointer-events-none ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
         />
         
