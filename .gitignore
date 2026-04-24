@@ -42,3 +42,7 @@ server/dev.db-journal
 
 # Other Local Settings
 .gemini/
+*.obj
+*.glb
+*.usdz
+!public/models/objfile.obj
