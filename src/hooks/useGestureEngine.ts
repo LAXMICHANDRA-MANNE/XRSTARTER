@@ -18,7 +18,7 @@ const PARAMS = {
   zoom_max: 5.0,
   zoom_sensitivity: 0.65,
   drag_smooth: 0.55,
-  smooth_alpha: 0.90,
+  smooth_alpha: 0.98,
 };
 
 export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, isProd: boolean = true) => {
@@ -80,9 +80,9 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
 
     if (results.multiHandLandmarks && results.multiHandedness) {
       results.multiHandedness.forEach((handedness, idx) => {
-        // Correct labels for non-mirrored camera
-        if (handedness.label === 'Left') left = results.multiHandLandmarks[idx];
-        else if (handedness.label === 'Right') right = results.multiHandLandmarks[idx];
+        // Swapped labels because the camera stream is mirrored
+        if (handedness.label === 'Right') left = results.multiHandLandmarks[idx];
+        else if (handedness.label === 'Left') right = results.multiHandLandmarks[idx];
       });
     }
 
@@ -107,9 +107,10 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
           s.last_pan_x = left[8].x;
           s.last_pan_y = left[8].y;
         } else {
-          // Invert X because camera is not mirrored
-          s.cum_pan_x -= (left[8].x - s.last_pan_x) * 2.5;
-          s.cum_pan_y += (left[8].y - s.last_pan_y) * 2.5;
+          // Adjust for mirrored movement sensitivity
+          // Adjust for mirrored movement sensitivity
+          s.cum_pan_x -= (left[8].x - s.last_pan_x) * 1.5;
+          s.cum_pan_y += (left[8].y - s.last_pan_y) * 1.5;
           s.last_pan_x = left[8].x;
           s.last_pan_y = left[8].y;
         }
@@ -157,9 +158,10 @@ export const useGestureEngine = (videoRef?: React.RefObject<HTMLVideoElement>, i
           }
           s.last_tap_time = t_now;
         } else {
-          s.cum_rot_x += (right[8].y - s.last_rot_y) * 4.5;
-          // Invert X rotation because camera is not mirrored
-          s.cum_rot_y -= (right[8].x - s.last_rot_x) * 4.5;
+
+          s.cum_rot_x += (right[8].y - s.last_rot_y) * 2.5;
+          // Adjust for mirrored rotation sensitivity
+          s.cum_rot_y += (right[8].x - s.last_rot_x) * 2.5;
           
           // Rotation Z (Roll)
           const angleDiff = angle - s.last_angle;

@@ -175,22 +175,25 @@ const LabsPage: React.FC = () => {
         Hover activated, raw text only via drop-shadow, no background container
       */}
       <div className="absolute top-6 left-6 z-50 pointer-events-auto group">
-         <div className="text-gray-400 font-mono text-sm cursor-help transition-colors duration-300 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-            [HOVER: Gesture Guide]
+         <div className="text-primary-400 font-mono text-xs cursor-help transition-all duration-300 drop-shadow-[0_0_8px_rgba(0,255,170,0.5)] border-l-2 border-primary-500 pl-3 uppercase tracking-tighter">
+            System Gestures v2.4 // Online
          </div>
-         <div className="mt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 select-none flex flex-col space-y-3 pointer-events-none">
-            <span className="text-emerald-400 font-extrabold text-base drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-               [Right Pinch + Drag] <span className="text-white font-semibold">Move Object</span>
-            </span>
-            <span className="text-emerald-400 font-extrabold text-base drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-               [Right Air Double Tap] <span className="text-white font-semibold">Irma AI Diagnostic</span>
-            </span>
-            <span className="text-teal-400 font-extrabold text-base drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-               [Left Pinch Distance] <span className="text-white font-semibold">Layer Peel / Cross-Section</span>
-            </span>
-            <span className="text-red-400 font-extrabold text-base drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-               [Right Fist Crush] <span className="text-white font-semibold">Reset / Clear Screen</span>
-            </span>
+         <div className="mt-4 opacity-0 group-hover:opacity-100 transition-all duration-500 select-none flex flex-col space-y-4 pointer-events-none translate-x-[-10px] group-hover:translate-x-0">
+            <div className="bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-r-2xl border-l-4 border-l-primary-500">
+                <span className="text-primary-400 font-black text-xs block mb-1 uppercase tracking-widest opacity-70">Interaction A</span>
+                <span className="text-white font-bold text-sm">[Right Pinch + Drag]</span>
+                <span className="text-primary-500/80 text-[10px] block mt-1 font-mono uppercase">Spatial Translation Mode</span>
+            </div>
+            <div className="bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-r-2xl border-l-4 border-l-secondary-500">
+                <span className="text-secondary-400 font-black text-xs block mb-1 uppercase tracking-widest opacity-70">Interaction B</span>
+                <span className="text-white font-bold text-sm">[Right Air Double Tap]</span>
+                <span className="text-secondary-500/80 text-[10px] block mt-1 font-mono uppercase">Neural Diagnostic Uplink</span>
+            </div>
+            <div className="bg-black/60 backdrop-blur-md border border-white/10 p-4 rounded-r-2xl border-l-4 border-l-teal-500">
+                <span className="text-teal-400 font-black text-xs block mb-1 uppercase tracking-widest opacity-70">Interaction C</span>
+                <span className="text-white font-bold text-sm">[Left Pinch Distance]</span>
+                <span className="text-teal-500/80 text-[10px] block mt-1 font-mono uppercase">Sub-Surface Cross Section</span>
+            </div>
          </div>
       </div>
 
@@ -212,14 +215,16 @@ const LabsPage: React.FC = () => {
       <motion.div 
         drag
         dragConstraints={containerRef}
-        className="absolute bottom-8 right-8 z-50 w-64 h-48 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/50 bg-white/30 backdrop-blur-md cursor-grab active:cursor-grabbing pointer-events-auto"
+        className="absolute bottom-8 right-8 z-50 w-72 h-52 rounded-3xl overflow-hidden shadow-[0_0_30px_rgba(0,255,170,0.2)] border-2 border-white/20 bg-black/40 backdrop-blur-2xl cursor-grab active:cursor-grabbing pointer-events-auto group"
       >
+        <div className="absolute inset-0 bg-gradient-to-tr from-primary-500/10 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary-500/50 to-transparent" />
         <video 
           ref={videoRef} 
           autoPlay 
           playsInline 
           muted 
-          style={{ transform: 'scaleX(1)' }}
+          style={{ transform: 'scaleX(-1)' }}
           className={`w-full h-full object-cover pointer-events-none ${cameraStatus !== 'active' ? 'opacity-0' : 'opacity-100'}`} 
         />
         
@@ -256,14 +261,14 @@ const LabsPage: React.FC = () => {
              initial={{opacity:0, y:-30}} 
              animate={{opacity:1, y:0}} 
              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-             className="bg-white/60 backdrop-blur-2xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl p-4 flex items-center pointer-events-auto"
+             className="bg-black/40 backdrop-blur-3xl border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-2xl p-5 flex items-center pointer-events-auto group"
            >
-             <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center mr-4 shadow-inner">
-                <FlaskConical className="text-white w-6 h-6" />
+             <div className="w-14 h-14 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-2xl flex items-center justify-center mr-5 shadow-[0_0_20px_rgba(99,102,241,0.4)] group-hover:scale-110 transition-transform">
+                <FlaskConical className="text-white w-7 h-7" />
              </div>
              <div>
-               <h1 className="text-gray-900 font-extrabold text-xl leading-tight tracking-tight">XR Simulator 2.0</h1>
-               <p className="text-gray-500 text-sm font-medium">Headless LPRO Core Active</p>
+               <h1 className="text-white font-black text-2xl leading-tight tracking-tighter uppercase italic">LPRO Core // Lab</h1>
+               <p className="text-primary-400 text-[10px] font-mono tracking-widest uppercase opacity-80 animate-pulse">Scanning Neural Assets...</p>
              </div>
            </motion.div>
         </div>
@@ -296,11 +301,11 @@ const LabsPage: React.FC = () => {
              initial={{opacity:0, x:-30}} 
              animate={{opacity:1, x:0}} 
              transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.2 }}
-             className="bg-white/60 backdrop-blur-2xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl p-4 flex items-center"
+             className="bg-black/40 backdrop-blur-3xl border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.3)] rounded-2xl p-5 flex items-center group cursor-pointer hover:border-primary-500/50 transition-all"
            >
-              <label className="cursor-pointer flex items-center text-gray-600 hover:text-gray-900 transition group w-full">
-                 <UploadCloud className="w-5 h-5 mr-3 group-hover:scale-110 group-hover:text-primary-500 transition-all font-bold" />
-                 <span className="font-bold text-sm mr-4 tracking-wide w-full relative top-0.5">Import Alternate Model</span>
+              <label className="cursor-pointer flex items-center text-gray-400 hover:text-white transition group w-full">
+                 <UploadCloud className="w-5 h-5 mr-4 group-hover:scale-110 group-hover:text-primary-500 transition-all font-bold" />
+                 <span className="font-bold text-[11px] mr-4 tracking-[0.2em] w-full relative top-0.5 uppercase">Load Neural Asset</span>
                  <input type="file" accept=".glb,.gltf,.obj,.stl,.ply" className="hidden" onChange={handleFileUpload} />
               </label>
            </motion.div>
@@ -309,26 +314,29 @@ const LabsPage: React.FC = () => {
              initial={{opacity:0, x:-30}} 
              animate={{opacity:1, x:0}} 
              transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.3 }}
-             className="bg-white/70 backdrop-blur-3xl border border-white/60 rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.12)] relative overflow-hidden"
+             className="bg-black/50 backdrop-blur-3xl border border-white/10 rounded-3xl p-8 shadow-[0_0_60px_rgba(0,0,0,0.4)] relative overflow-hidden group"
            >
-               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 to-secondary-500" />
-               <h2 className="text-lg font-extrabold text-gray-900 mb-4 flex items-center">
-                 <Layers className="w-5 h-5 mr-2 text-secondary-500" />
-                 Layer Metrics
+               <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary-500 via-secondary-500 to-primary-500 animate-gradient-x" />
+               <h2 className="text-white font-black text-sm mb-6 flex items-center uppercase tracking-[0.2em] opacity-90">
+                 <Layers className="w-4 h-4 mr-3 text-primary-500" />
+                 Telemetry Stream
                </h2>
 
-               <div className="space-y-4">
+               <div className="space-y-6">
                   <div>
-                    <div className="text-xs text-gray-400 font-bold tracking-wider mb-1">GESTURE PEEL DEPTH</div>
-                    <div className="text-3xl font-light text-primary-600 font-mono">
-                      {(peelValue * 100).toFixed(0)}%
+                    <div className="text-[10px] text-primary-400/60 font-mono font-bold tracking-[0.3em] mb-2 uppercase">Peel Intensity</div>
+                    <div className="text-5xl font-black text-white font-mono tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                      {(peelValue * 100).toFixed(0)}<span className="text-lg text-primary-500 ml-1">%</span>
                     </div>
                   </div>
 
                   {layerData && (
-                    <div className="pt-4 border-t border-gray-200">
-                      <div className="text-xs text-secondary-500 font-extrabold mb-2 tracking-wide uppercase">TARGET: {layerData.partName}</div>
-                      <div className="text-gray-600 text-sm leading-relaxed font-medium">
+                    <div className="pt-6 border-t border-white/5">
+                      <div className="text-[10px] text-secondary-400 font-mono font-black mb-3 tracking-[0.2em] uppercase flex items-center">
+                        <div className="w-2 h-2 bg-secondary-500 rounded-full mr-2 animate-ping" />
+                        Component ID: {layerData.partName}
+                      </div>
+                      <div className="text-gray-300 text-xs leading-relaxed font-medium font-mono border-l-2 border-secondary-500/30 pl-4 py-1">
                         {layerData.description}
                       </div>
                     </div>
@@ -336,25 +344,27 @@ const LabsPage: React.FC = () => {
                </div>
 
                {/* AI Double Tap Section */}
-               <div className="mt-6 pt-4 border-t border-gray-200">
-                  <h3 className="text-xs text-gray-400 font-bold tracking-wider mb-3 flex items-center">
-                    <Cpu className="w-4 h-4 mr-2 text-gray-400" /> 
-                    AI DIAGNOSTIC (DOUBLE AIR TAP)
+               <div className="mt-8 pt-6 border-t border-white/10">
+                  <h3 className="text-[10px] text-primary-400/60 font-mono font-black tracking-[0.3em] mb-4 flex items-center uppercase">
+                    <Cpu className="w-4 h-4 mr-3 text-primary-500 animate-pulse" /> 
+                    AI Core Uplink
                   </h3>
                   
                   {aiGenerating ? (
-                    <div className="flex space-x-1 items-center opacity-70">
-                       <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" />
-                       <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
-                       <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                    <div className="flex space-x-2 items-center opacity-70 p-4 bg-primary-500/5 rounded-xl border border-primary-500/20">
+                       <div className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-bounce" />
+                       <div className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
+                       <div className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                       <span className="text-[10px] text-primary-400 font-mono ml-4 uppercase tracking-widest">Processing spectral data...</span>
                     </div>
                   ) : aiReport ? (
-                    <div className="text-xs text-green-700 font-mono leading-tight bg-green-50 p-3 rounded-lg border border-green-200 shadow-sm">
-                      {aiReport}
+                    <div className="text-[10px] text-green-400 font-mono leading-relaxed bg-green-500/5 p-4 rounded-xl border border-green-500/20 shadow-[inset_0_0_20px_rgba(0,255,100,0.05)]">
+                       <span className="text-green-500 font-black block mb-2 tracking-widest">[DIAGNOSTIC DATA RECEIVED]</span>
+                       {aiReport.replace('[IRMA DIAGNOSTIC]: ', '')}
                     </div>
                   ) : (
-                    <div className="text-xs text-gray-400 font-medium italic">
-                      Air Double Tap to run Irma Diagnostic...
+                    <div className="text-[10px] text-gray-500 font-medium italic font-mono p-4 border border-dashed border-white/10 rounded-xl">
+                      Waiting for Air Double-Tap to initiate Irma scan...
                     </div>
                   )}
                </div>

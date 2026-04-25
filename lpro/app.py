@@ -43,4 +43,4 @@ def serve_upload(name):
     return send_file(full)
 
 if __name__ == "__main__":
-    app.run(debug=False, use_reloader=False)
+    app.run(debug=False, use_reloader=False, port=5001)

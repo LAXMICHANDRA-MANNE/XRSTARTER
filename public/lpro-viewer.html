@@ -6,11 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Modern Three.js core + loaders from CDN for robust .GLB parsing -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/PLYLoader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.0/examples/js/loaders/OBJLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.0/examples/js/loaders/PLYLoader.js"></script>
 
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -123,8 +123,16 @@ function init3D() {
     dirLight.position.set(5, 10, 5);
     scene.add(dirLight);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.8);
+    const amb = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(amb);
+
+    // Cyberpunk Grid Floor
+    const gridHelper = new THREE.GridHelper(20, 40, 0x00ffaa, 0x004433);
+    gridHelper.position.y = -1.5;
+    scene.add(gridHelper);
+
+    // Fog for depth
+    scene.fog = new THREE.Fog(0x000000, 2, 10);
 
     window.addEventListener("resize", onWindowResize);
 
@@ -148,9 +156,9 @@ function loop() {
         rootObject.scale.setScalar(baseScale * scaleFactor);
 
         // rotation
-        rootObject.rotation.x = lerp(rootObject.rotation.x, targetState.rotation_x, 0.1);
-        rootObject.rotation.y = lerp(rootObject.rotation.y, targetState.rotation_y, 0.1);
-        rootObject.rotation.z = lerp(rootObject.rotation.z, targetState.rotation_z, 0.1);
+        rootObject.rotation.x = lerp(rootObject.rotation.x, targetState.rotation_x, 0.25);
+        rootObject.rotation.y = lerp(rootObject.rotation.y, targetState.rotation_y, 0.25);
+        rootObject.rotation.z = lerp(rootObject.rotation.z, targetState.rotation_z, 0.25);
 
         // peel layers
         if (peelEnabled) applyPeel(targetState.peel);
@@ -161,8 +169,8 @@ function loop() {
         // Clamp to screen bounds
         nx = Math.max(-3.5, Math.min(3.5, nx));
         ny = Math.max(-2.5, Math.min(2.5, ny));
-        rootObject.position.x = lerp(rootObject.position.x, nx, 0.1);
-        rootObject.position.y = lerp(rootObject.position.y, ny, 0.1);
+        rootObject.position.x = lerp(rootObject.position.x, nx, 0.25);
+        rootObject.position.y = lerp(rootObject.position.y, ny, 0.25);
     }
     
     renderer.render(scene, camera);
@@ -248,10 +256,29 @@ function setRootObject(object3D) {
 
 // ------------- LOADERS -------------
 function loadOBJ(path) {
+    console.log("Starting OBJ load for:", path);
     const loader = new THREE.OBJLoader();
-    loader.load(path, obj => {
-        setRootObject(obj);
-    });
+    loader.load(
+        path, 
+        obj => {
+            console.log("OBJ loaded successfully:", path);
+            setRootObject(obj);
+        },
+        xhr => {
+            if (xhr.lengthComputable) {
+                const percent = (xhr.loaded / xhr.total) * 100;
+                console.log(`Loading OBJ: ${percent.toFixed(2)}%`);
+                document.getElementById('loading-text').innerText = `Loading: ${percent.toFixed(0)}%`;
+            }
+        },
+        error => {
+            console.error("OBJ Load Error:", error);
+            document.getElementById('loading-text').innerText = "Load Error! Check Console.";
+            setTimeout(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }, 3000);
+        }
+    );
 }
 
 function loadGLTF(path) {

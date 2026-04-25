@@ -9,7 +9,7 @@ import Stripe from 'stripe';
 const adapter = new PrismaBetterSqlite3({ url: 'file:./dev.db' });
 const prisma = new PrismaClient({ adapter });
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // Initialize Google Auth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'mock_google_id');
